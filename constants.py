@@ -8,7 +8,9 @@ level_start_maps = {
     3: 1450,
     4: 1450
 }
-
+print_cols = ['tourney_date','player_name','rating_start','Ne','m','k_factor',
+              'total_score','avg_score','dp','performance_rating','expected_score',
+              'update','rating_end']
 player_lookback = 12
 tourn_code_map = {
     'D': 1,
