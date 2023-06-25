@@ -1,17 +1,32 @@
-from utils import MatchLoader
+from utils import MatchLoader, csv_to_dict
 import pandas as pd
 import constants as cn
-import os
-
 
 # a, b = load_matches(2000,2020)
 
-m = MatchLoader()
+wta = MatchLoader("current_matches", "wta")
 
-tour_matches_df, qual_matches_df = m.load_matches(2000,2009)
+tour_matches_df, qual_matches_df = wta.load_matches(2000)
+
+rankings_df = pd.DataFrame(columns=['tourney_date','player_name','rating_start','Ne','m','k_factor','total_score','avg_score','dp','performance_rating','expected_score','update','rating_end'])
+DP_LOOKUP = csv_to_dict("dp_lookup.csv","p","dp")
+
+print(tour_matches_df['tourney_level'].unique())
+print(qual_matches_df['tourney_level'].unique())
+
+def get_first_rating(level):
+    if level == 1:
+        return cn.main_tour_new
+    elif level == 2:
+        return cn.chal_tour_new
+    elif level == 3:
+        return cn.itf_tour_new
+    elif level == 4:
+        return cn.qual_tour_new
 
 # print(tour_matches_df.columns)
-
+def one_match_elo_expect(r_a, r_b):
+    return 1 / (1 + 10 ** ((r_b - r_a)/400))
 
 def run_date(date, matches_df, rankings_df, level=1):
     matches_df = matches_df[matches_df['tourney_date'] == date]
@@ -37,7 +52,7 @@ def run_date(date, matches_df, rankings_df, level=1):
         k_factor = 800 / (ne + m + 8)
         total_score = player_df[player_df['winner_name'] == player]['s1'].sum() + player_df[player_df['loser_name']['s2']].sum()
         avg_score = total_score / m
-        dp = dp_lookup_df[dp_lookup_df['p']==avg_score].at[0,'dp']
+        dp = DP_LOOKUP[round(avg_score,2)]
         opponents = list(matches_df[matches_df['winner_name']==player]['loser_name']) + list(matches_df[matches_df['loser_name']==player]['winner_name'])
         if len(rankings_df) > 0:
             opponents_rankings = list(rankings_df[(rankings_df['player_name'].isin(opponents)) &

@@ -1,11 +1,12 @@
 import pandas as pd
 import constants as cn
 import os
+import csv
 
 class MatchLoader:
     def __init__(self, folder, tour):
         self.folder = folder
-        self.tour = tour
+        self.tour = tour.lower()
 
     def load_matches(self, start, end=None):
         yr = start
@@ -82,26 +83,28 @@ class MatchLoader:
         df['s1'] = round(0.25 + 0.75*(df['winner_games'] / df['total_games']), 2)
         df['s2'] = round(0.75*(df['loser_games'] / df['total_games']), 2)
 
+        df['tourney_group'] = df['tourney_level'].map(cn.tourn_code_map)
+
         return df
 
-def get_first_rating(level):
-        if level == 1:
-            return cn.main_tour_new
-        elif level == 2:
-            return cn.chal_tour_new
-        elif level == 3:
-            return cn.itf_tour_new
-        elif level == 4:
-            return cn.qual_tour_new
+
 
     # new_rankings_df = pd.DataFrame.from_dict(new_rankings_dict)
 
-dp_lookup_df = pd.read_csv("dp_lookup.csv")
-def one_match_elo_expect(r_a, r_b):
-    return 1 / (1 + 10 ** ((r_b - r_a)/400))
+def csv_to_dict(filename, key_column, value_column):
+    result = {}
+    with open(filename, 'r') as file:
+        reader = csv.DictReader(file)
+        for row in reader:
+            key = row[key_column]
+            value = row[value_column]
+            result[key] = value
+
+    return result
 
 
-rankings_df = pd.DataFrame(columns=['tourney_date','player_name','rating_start','Ne','m','k_factor','total_score','avg_score','dp','performance_rating','expected_score','update','rating_end'])
+
+
 
 # run_date(20000103, tour_matches_df, rankings_df, 2)
 
