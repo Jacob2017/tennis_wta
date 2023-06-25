@@ -1,5 +1,8 @@
-import pandas as pd
-import os
+import polars as pl
+import io, os, sys
+import constants as cn
+
+# sys.stdout.encoding = 'utf-8'
 
 def load_matches(year):
     """
@@ -10,14 +13,112 @@ def load_matches(year):
     wta_template = "wta_matches_{}.csv"
     qual_itf_template = "wta_matches_qual_itf_{}.csv"
 
-    main_df = pd.read_csv(os.path.join(folder,wta_template.format(year)))
-    qual_df = pd.read_csv(os.path.join(folder,qual_itf_template.format(year)))
-
     keep_cols = ['tourney_id','tourney_name', 'surface', 'draw_size', 'tourney_level',
                  'tourney_date', 'match_num', 'winner_name', 'winner_id', 'loser_name', 
                  'loser_id', 'score', 'best_of', 'round']
+    # keep_cols = [keep_cols[0]]
 
-    return main_df[keep_cols], qual_df[keep_cols]
+    main_df = pl.read_csv(os.path.join(folder,wta_template.format(year)),
+                        dtypes=cn.csv_dtypes,
+                        columns=keep_cols,
+                        n_rows=100
+                        #   ignore_errors=True
+                        # infer_schema_length=1000
+                        )
+    # qual_df = pl.read_csv(os.path.join(folder,qual_itf_template.format(year)),
+    #                       dtypes=cn.csv_dtypes)
+
+    
+    
+    # identify_encoding_issue(main_df)
+
+    # print(main_df)
+
+    # return main_df.select([keep_cols]), qual_df.select([keep_cols])
+    return main_df
+
+def parse_scores(score):
+    set_scores = score.split(" ")
+    output_games = []
+    for set in set_scores:
+        output_games.append(set[0])
+        output_games.append(set[2])
+    while len(output_games) < 10:
+        output_games.append(0)
+    return output_games
+
+
+def polar_prep(df):
+    score_cols = ['w_set1', 'l_set1', 'w_set2', 'l_set2', 'w_set3', 'l_set3', 'w_set4', 'l_set4',
+                  'w_set5', 'l_set5']
+
+    df = df.with_columns(
+        pl.col('score').apply(parse_scores).alias('game_scores')
+    )
+
+    for i, col in enumerate(score_cols):
+        df = df.with_columns(
+            pl.col('game_scores').apply(lambda s: int(s[i]) if (i < len(s) and s[i] is not None) else 0).alias(col)        
+        )
+        
+
+    df = df.with_columns(
+        winner_games=pl.expr.list_sum([df[col] for col in score_cols if col.startswith('w_set')]),
+        loser_games=pl.expr.list_sum([df[col] for col in score_cols if col.startswith('l_set')]),
+        total_games=pl.expr.list_sum(df['game_scores']),
+        s1=pl.round(0.25 + 0.75 * (pl.col('winner_games') / pl.col('total_games')), 2),
+        s2=pl.round(0.75 * (pl.col('loser_games') / pl.col('total_games')), 2)
+    )
+    return df
+
+# # Example usage:
+# df = pl.DataFrame({
+#     'score': ["6-3 7-6(5)", "4-6 6-4 7-5"]
+# })
+
+# df = prep_df(df)
+# print(df)
+
+if __name__ == "__main__":
+    display_cols = ["tourney_name","match_num","winner_name","loser_name","score","sets_list"]
+    a = load_matches("2000")
+    a = polar_prep(a)
+    with pl.Config(tbl_cols=1000):
+        print(a.select(pl.col(display_cols)))
+
+def prep_df(df):
+    score_cols = ['w_set1', 'l_set1', 'w_set2', 'l_set2', 'w_set3', 'l_set3', 'w_set4', 'l_set4',
+              'w_set5', 'l_set5']
+
+    df['w_set1'], df['l_set1'], df['w_set2'], df['l_set2'], df['w_set3'], df['l_set3'], df['w_set4'],\
+    df['l_set4'], df['w_set5'], df['l_set5'] = zip(*df['score'].map(parse_scores))
+
+    for col in score_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce').convert_dtypes().fillna(0)
+
+    df['winner_games'], df['loser_games'], df['total_games'] = zip(*df.apply(get_total_games, axis=1))
+    df['s1'] = round(0.25 + 0.75*(df['winner_games'] / df['total_games']), 2)
+    df['s2'] = round(0.75*(df['loser_games'] / df['total_games']), 2)
+
+    return df
+
+def extract_scores(df):
+    out = df.with_columns(
+        [
+            pl.col("score")
+            .str.extract_all(
+                r'\d+(?![^(]*\))'
+            )
+        ]
+    )
+    # out = out.explode("sets_list")
+    return out
+
+
+
+    
+
+    
 
 def parse_scores(score):
     set_scores = score.split(" ")
@@ -39,21 +140,7 @@ def get_elo_score(row):
     loser_total = row['l_set1'] + row['l_set2'] + row['l_set3'] + row['l_set4'] + row['l_set5']
     return 0.5 + 0.5 * (winner_total / (winner_total + loser_total)), 0.5 * (loser_total / (winner_total+loser_total))
 
-def prep_df(df):
-    score_cols = ['w_set1', 'l_set1', 'w_set2', 'l_set2', 'w_set3', 'l_set3', 'w_set4', 'l_set4',
-              'w_set5', 'l_set5']
 
-    df['w_set1'], df['l_set1'], df['w_set2'], df['l_set2'], df['w_set3'], df['l_set3'], df['w_set4'],\
-    df['l_set4'], df['w_set5'], df['l_set5'] = zip(*df['score'].map(parse_scores))
-
-    for col in score_cols:
-        df[col] = pd.to_numeric(df[col], errors='coerce').convert_dtypes().fillna(0)
-
-    df['winner_games'], df['loser_games'], df['total_games'] = zip(*df.apply(get_total_games, axis=1))
-    df['s1'] = round(0.25 + 0.75*(df['winner_games'] / df['total_games']), 2)
-    df['s2'] = round(0.75*(df['loser_games'] / df['total_games']), 2)
-
-    return df
 
 def get_first_rating(level):
     if level == 1:
@@ -84,9 +171,8 @@ def load_matches_range(start,end):
     return tour_matches_df, qual_matches_df
 
 
-# a, b = load_matches(2000,2020)
 
-tour_matches_df, qual_matches_df = load_matches_range(2000,2009)
+# tour_matches_df, qual_matches_df = load_matches_range(2000,2009)
 
 # print(tour_matches_df.columns)
 
@@ -142,22 +228,22 @@ def run_date(date, matches_df, rankings_df, level=1):
         break
     # new_rankings_df = pd.DataFrame.from_dict(new_rankings_dict)
 
-dp_lookup_df = pd.read_csv("dp_lookup.csv")
+# dp_lookup_df = pd.read_csv("dp_lookup.csv")
 def one_match_elo_expect(r_a, r_b):
     return 1 / (1 + 10 ** ((r_b - r_a)/400))
 
 
-rankings_df = pd.DataFrame(columns=['tourney_date','player_name','rating_start','Ne','m','k_factor','total_score','avg_score','dp','performance_rating','expected_score','update','rating_end'])
+# rankings_df = pd.DataFrame(columns=['tourney_date','player_name','rating_start','Ne','m','k_factor','total_score','avg_score','dp','performance_rating','expected_score','update','rating_end'])
 
 # run_date(20000103, tour_matches_df, rankings_df, 2)
 
-with pd.option_context('display.max_columns', None, 'display.max_rows', None):
-    # print(tour_matches_df['winner_name'].nunique())
-    # print(tour_matches_df['loser_name'].nunique())
-    # print(qual_matches_df['winner_name'].nunique())
-    # print(qual_matches_df['loser_name'].nunique())
+# with pd.option_context('display.max_columns', None, 'display.max_rows', None):
+#     # print(tour_matches_df['winner_name'].nunique())
+#     # print(tour_matches_df['loser_name'].nunique())
+#     # print(qual_matches_df['winner_name'].nunique())
+#     # print(qual_matches_df['loser_name'].nunique())
 
-    pass
+#     pass
     # print(tour_matches_df['tourney_level'].unique())
     # print(qual_matches_df['tourney_level'].unique())
 
