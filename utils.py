@@ -3,7 +3,12 @@ import constants as cn
 import os
 import csv
 
+
 class MatchLoader:
+    """
+    Utility class to load matches from CSV.
+    """
+
     def __init__(self, folder, tour):
         self.folder = folder
         self.tour = tour.lower()
@@ -20,11 +25,15 @@ class MatchLoader:
             if tour_matches_df is None:
                 tour_matches_df = a
             else:
-                tour_matches_df = pd.concat([tour_matches_df, a], axis=0, ignore_index=True)
+                tour_matches_df = pd.concat(
+                    [tour_matches_df, a], axis=0, ignore_index=True
+                )
             if qual_matches_df is None:
                 qual_matches_df = b
             else:
-                qual_matches_df = pd.concat([qual_matches_df, b], axis=0, ignore_index=True)
+                qual_matches_df = pd.concat(
+                    [qual_matches_df, b], axis=0, ignore_index=True
+                )
 
             yr += 1
 
@@ -37,12 +46,29 @@ class MatchLoader:
         template = "{}_matches_{}.csv"
         # qual_itf_template = "{}_matches_qual_itf_{}.csv"
 
-        main_df = pd.read_csv(os.path.join(self.folder,template.format(self.tour, year)))
-        qual_df = pd.read_csv(os.path.join(self.folder,template.format(self.tour, "qual_itf_"+year)))
+        main_df = pd.read_csv(
+            os.path.join(self.folder, template.format(self.tour, year))
+        )
+        qual_df = pd.read_csv(
+            os.path.join(self.folder, template.format(self.tour, "qual_itf_" + year))
+        )
 
-        keep_cols = ['tourney_id','tourney_name', 'surface', 'draw_size', 'tourney_level',
-                    'tourney_date', 'match_num', 'winner_name', 'winner_id', 'loser_name', 
-                    'loser_id', 'score', 'best_of', 'round']
+        keep_cols = [
+            "tourney_id",
+            "tourney_name",
+            "surface",
+            "draw_size",
+            "tourney_level",
+            "tourney_date",
+            "match_num",
+            "winner_name",
+            "winner_id",
+            "loser_name",
+            "loser_id",
+            "score",
+            "best_of",
+            "round",
+        ]
 
         return main_df[keep_cols], qual_df[keep_cols]
 
@@ -56,44 +82,91 @@ class MatchLoader:
         while len(output_games) < 10:
             output_games.append(0)
         return output_games
-    
+
     @staticmethod
     def get_total_games(row):
-        winner_total = row['w_set1'] + row['w_set2'] + row['w_set3'] + row['w_set4'] + row['w_set5']
-        loser_total = row['l_set1'] + row['l_set2'] + row['l_set3'] + row['l_set4'] + row['l_set5']
-        return winner_total, loser_total, winner_total+loser_total
+        winner_total = (
+            row["w_set1"]
+            + row["w_set2"]
+            + row["w_set3"]
+            + row["w_set4"]
+            + row["w_set5"]
+        )
+        loser_total = (
+            row["l_set1"]
+            + row["l_set2"]
+            + row["l_set3"]
+            + row["l_set4"]
+            + row["l_set5"]
+        )
+        return winner_total, loser_total, winner_total + loser_total
 
     @staticmethod
     def get_elo_score(row):
-        winner_total = row['w_set1'] + row['w_set2'] + row['w_set3'] + row['w_set4'] + row['w_set5']
-        loser_total = row['l_set1'] + row['l_set2'] + row['l_set3'] + row['l_set4'] + row['l_set5']
-        return 0.5 + 0.5 * (winner_total / (winner_total + loser_total)), 0.5 * (loser_total / (winner_total+loser_total))
+        winner_total = (
+            row["w_set1"]
+            + row["w_set2"]
+            + row["w_set3"]
+            + row["w_set4"]
+            + row["w_set5"]
+        )
+        loser_total = (
+            row["l_set1"]
+            + row["l_set2"]
+            + row["l_set3"]
+            + row["l_set4"]
+            + row["l_set5"]
+        )
+        return 0.5 + 0.5 * (winner_total / (winner_total + loser_total)), 0.5 * (
+            loser_total / (winner_total + loser_total)
+        )
 
     def prep_df(self, df):
-        score_cols = ['w_set1', 'l_set1', 'w_set2', 'l_set2', 'w_set3', 'l_set3', 'w_set4', 'l_set4',
-                'w_set5', 'l_set5']
+        score_cols = [
+            "w_set1",
+            "l_set1",
+            "w_set2",
+            "l_set2",
+            "w_set3",
+            "l_set3",
+            "w_set4",
+            "l_set4",
+            "w_set5",
+            "l_set5",
+        ]
 
-        df['w_set1'], df['l_set1'], df['w_set2'], df['l_set2'], df['w_set3'], df['l_set3'], df['w_set4'],\
-        df['l_set4'], df['w_set5'], df['l_set5'] = zip(*df['score'].map(self.parse_scores))
+        (
+            df["w_set1"],
+            df["l_set1"],
+            df["w_set2"],
+            df["l_set2"],
+            df["w_set3"],
+            df["l_set3"],
+            df["w_set4"],
+            df["l_set4"],
+            df["w_set5"],
+            df["l_set5"],
+        ) = zip(*df["score"].map(self.parse_scores))
 
         for col in score_cols:
-            df[col] = pd.to_numeric(df[col], errors='coerce').convert_dtypes().fillna(0)
+            df[col] = pd.to_numeric(df[col], errors="coerce").convert_dtypes().fillna(0)
 
-        df['winner_games'], df['loser_games'], df['total_games'] = zip(*df.apply(self.get_total_games, axis=1))
-        df['s1'] = round(0.25 + 0.75*(df['winner_games'] / df['total_games']), 2)
-        df['s2'] = round(0.75*(df['loser_games'] / df['total_games']), 2)
+        df["winner_games"], df["loser_games"], df["total_games"] = zip(
+            *df.apply(self.get_total_games, axis=1)
+        )
+        df["s1"] = round(0.25 + 0.75 * (df["winner_games"] / df["total_games"]), 2)
+        df["s2"] = round(0.75 * (df["loser_games"] / df["total_games"]), 2)
 
-        df['tourney_group'] = df['tourney_level'].map(cn.tourn_code_map)
+        df["tourney_group"] = df["tourney_level"].map(cn.tourn_code_map)
 
         return df
 
-
-
     # new_rankings_df = pd.DataFrame.from_dict(new_rankings_dict)
+
 
 def csv_to_dict(filename, key_column, value_column):
     result = {}
-    with open(filename, 'r') as file:
+    with open(filename, "r") as file:
         reader = csv.DictReader(file)
         for row in reader:
             key = row[key_column]
@@ -102,12 +175,11 @@ def csv_to_dict(filename, key_column, value_column):
 
     return result
 
+
 def df_print(df):
     temp_df = df[cn.print_cols]
-    with pd.option_context('display.max_columns', None, 'display.max_rows', None):
+    with pd.option_context("display.max_columns", None, "display.max_rows", None):
         print(df)
-
-
 
 
 # run_date(20000103, tour_matches_df, rankings_df, 2)
@@ -130,7 +202,3 @@ def df_print(df):
 # print(qual_matches_df[qual_matches_df['tourney_date']==min(qual_matches_df['tourney_date'])])
 # print(a)
 # print(a.dtypes)
-
-
-    
-    
