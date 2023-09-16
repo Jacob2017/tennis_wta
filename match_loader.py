@@ -14,7 +14,6 @@ class MatchLoader:
         self.folder = folder
         self.tour = tour.lower()
 
-
     def load_matches(self, start, end=None):
         yr = start
         if end is None:
@@ -61,97 +60,88 @@ class MatchLoader:
         """
         template = "{}_matches_{}.csv"
         # qual_itf_template = "{}_matches_qual_itf_{}.csv"
-        keep_cols = [
-            "tourney_id",
-            "tourney_name",
-            "surface",
-            "draw_size",
-            "tourney_level",
-            "tourney_date",
-            "match_num",
-            "winner_name",
-            "winner_id",
-            "loser_name",
-            "loser_id",
-            "score",
-            "best_of",
-            "round",
-            "year",
-            "level"
-        ]
+        # keep_cols = [
+        #     "tourney_id",
+        #     "tourney_name",
+        #     "surface",
+        #     "draw_size",
+        #     "tourney_level",
+        #     "tourney_date",
+        #     "match_num",
+        #     "winner_name",
+        #     "winner_id",
+        #     "loser_name",
+        #     "loser_id",
+        #     "score",
+        #     "best_of",
+        #     "round",
+        #     "year",
+        #     "level"
+        # ]
         try:
-            main_df = pd.read_csv(
-                os.path.join(self.folder, template.format(self.tour, year))
-            )
-        except FileNotFoundError:
-            print(f"No file available: {template.format(self.tour,year)}")
-            main_df = pd.DataFrame(columns=cn.output_cols)
-        except UnicodeDecodeError:
             with open(os.path.join(self.folder, template.format(self.tour, year)), 'rb') as f:
                 result = chardet.detect(f.read())
-
             main_df = pd.read_csv(os.path.join(self.folder, template.format(self.tour, year)), 
-                             encoding=result['encoding'])
-
-        try:    
-            qual_df = pd.read_csv(
-                os.path.join(self.folder, template.format(self.tour, "qual_itf_" + year))
-            )
+                                    encoding=result['encoding'])
         except FileNotFoundError:
-            print(f"No file available: {template.format(self.tour, 'qual_itf_' + year)}")
-            qual_df = pd.DataFrame(columns=cn.output_cols)
-        except UnicodeDecodeError:
+            print(f"No file available: {template.format(self.tour,year)}")
+            main_df = pd.DataFrame(columns=cn.added_cols+cn.csv_cols)
+
+        try:
             with open(os.path.join(self.folder, template.format(self.tour, "qual_itf_" + year)), 'rb') as f:
                 result = chardet.detect(f.read())
 
             qual_df = pd.read_csv(os.path.join(self.folder, template.format(self.tour, "qual_itf_" + year)), 
                              encoding=result['encoding'])
+        except FileNotFoundError:
+            print(f"No file available: {template.format(self.tour, 'qual_itf_' + year)}")
+            qual_df = pd.DataFrame(columns=cn.output_cols)            
         
-        main_df['year'] = [year] * len(main_df)
+        main_df['season'] = [int(year)] * len(main_df)
         main_df['level'] = ['Main'] * len(main_df)
-        qual_df['year'] = [year] * len(qual_df)
+        qual_df['season'] = [int(year)] * len(qual_df)
         qual_df['level'] = ['Lower'] * len(qual_df)
 
-        return main_df[keep_cols], qual_df[keep_cols]
+        return main_df, qual_df
     
     @staticmethod
     def prep_df(df):
-        score_cols = [
-            "w_set1",
-            "l_set1",
-            "w_set2",
-            "l_set2",
-            "w_set3",
-            "l_set3",
-            "w_set4",
-            "l_set4",
-            "w_set5",
-            "l_set5",
-        ]
+        # score_cols = [
+        #     "w_set1",
+        #     "l_set1",
+        #     "w_set2",
+        #     "l_set2",
+        #     "w_set3",
+        #     "l_set3",
+        #     "w_set4",
+        #     "l_set4",
+        #     "w_set5",
+        #     "l_set5",
+        # ]
 
-        (
-            df["w_set1"],
-            df["l_set1"],
-            df["w_set2"],
-            df["l_set2"],
-            df["w_set3"],
-            df["l_set3"],
-            df["w_set4"],
-            df["l_set4"],
-            df["w_set5"],
-            df["l_set5"],
-        ) = zip(*df["score"].map(MatchLoader.parse_scores))
+        # (
+        #     df["w_set1"],
+        #     df["l_set1"],
+        #     df["w_set2"],
+        #     df["l_set2"],
+        #     df["w_set3"],
+        #     df["l_set3"],
+        #     df["w_set4"],
+        #     df["l_set4"],
+        #     df["w_set5"],
+        #     df["l_set5"],
+        # ) = zip(*df["score"].map(MatchLoader.parse_scores))
 
-        for col in score_cols:
-            df[col] = pd.to_numeric(df[col], errors="coerce").convert_dtypes().fillna(0)
+        # for col in score_cols:
+        #     df[col] = pd.to_numeric(df[col], errors="coerce").convert_dtypes().fillna(0)
 
-        df["winner_games"], df["loser_games"], df["total_games"] = zip(
-            *df.apply(MatchLoader.get_total_games, axis=1)
-        )
-        df["wo_flag"] = df["total_games"] == 0
-        df["short_match_flag"] = df["total_games"] <= 6
-        df["s1"] = round(0.25 + 0.75 * (df["winner_games"] / df["total_games"]), 2)
-        df["s2"] = round(0.75 * (df["loser_games"] / df["total_games"]), 2)
+        # df["winner_games"], df["loser_games"], df["total_games"] = zip(
+        #     *df.apply(MatchLoader.get_total_games, axis=1)
+        # )
+        # df["wo_flag"] = df["total_games"] == 0
+        # df["short_match_flag"] = df["total_games"] <= 6
+        # df["s1"] = round(0.25 + 0.75 * (df["winner_games"] / df["total_games"]), 2)
+        # df["s2"] = round(0.75 * (df["loser_games"] / df["total_games"]), 2)
         
         df["tourney_group"] = df["tourney_level"].map(cn.tourn_code_map)
         df["draw_str"] = np.where(df["round"].isin(["Q1","Q2","Q3","Q4","Q5"]),"Q", "MD")
@@ -159,7 +149,7 @@ class MatchLoader:
         df["tourney_date"] = pd.to_datetime(df.tourney_date,format="%Y%m%d")
         player_id_map = csv_to_dict(os.path.join("outputs","wta_player_id_mapping.csv"),"old_id","new_id")
         df.replace({'winner_id':player_id_map, 'loser_id':player_id_map}, inplace=True)
-        df = df[[x for x in cn.output_cols if x in df.columns]]
+        # df = df[[x for x in cn.output_cols if x in df.columns]]
         return df
 
     @staticmethod

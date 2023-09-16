@@ -1,38 +1,52 @@
 from sqlite_operator import SqliteOperator
-from utils import csv_to_dict, df_print
+from utils import df_print
 import constants as cn
-import pandas as pd
-import os
 from db_utils import DbUtils
+import sys
+
+class TableLoader:
+    def __init__(self):
+        pass
+
+    def load(self, table, cols, start, end=None):
+        DbUtils.reset_table(table, cols)
+        self.load_matches(table, start, end)
+        self.verify_table(table)
+
+    @staticmethod
+    def load_matches(table, start, end=None):
+        yr = start
+        if end is None:
+            end = start
+        print(f"Loading matches from {start} - {end}")
+        sqlite_obj = SqliteOperator(cn.db_folder, cn.db_file)
+        while yr <= end:
+            print("\n\n")
+            print(yr)
+            sqlite_obj.add_year_to_table(yr, table)
+            yr += 1
+
+    @staticmethod
+    def verify_table(table):
+        query = f"""
+        SELECT *
+        FROM {table}
+        WHERE score != 'W/O'
+        ORDER BY score DESC
+        LIMIT 50
+        """
+        res = DbUtils.run_query(query, get_df=True,verbose=True)
+        df_print(res)
+
+if __name__ == "__main__":
+    sys.stdin.reconfigure(encoding='utf-8')
+    sys.stdout.reconfigure(encoding='utf-8')
+    loader = TableLoader()
+    loader.load("wta_matches_raw",cn.added_cols+cn.csv_cols, 1968,2022)
+    loader.verify_table("wta_matches_raw")
 
 
-
-def load_matches(start, end=None):
-    yr = start
-    if end is None:
-        end = start
-    print(f"Loading matches from {start} - {end}")
-    sqlite_obj = SqliteOperator(cn.db_folder, cn.db_file)
-    while yr <= end:
-        print("\n\n")
-        print(yr)
-        sqlite_obj.add_year_to_table(yr,"wta_matches")
-        yr += 1
-
-DbUtils.reset_table("wta_matches",cn.output_cols)
-load_matches(1968,2022)
-
-def verify_table():
-    query = """
-    SELECT *
-    FROM wta_matches
-    ORDER BY s2 DESC
-    LIMIT 50
-    """
-
-    res = DbUtils.run_query(query, get_df=True,verbose=True)
-    df_print(res)
-
+# ï¿½
 # def get_player_table():
 #     query = """
 #     SELECT

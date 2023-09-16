@@ -14,5 +14,7 @@ class Season:
         query_template = SqliteOperator.get_sql_file("annual_tournaments.sql","query_templates")
         tourn_query = query_template.replace("@year",str(year))
         tourn_df = DbUtils.run_query(tourn_query, get_df=True)
-        df_print(tourn_df)
-        return tourn_df
+        # df_print(tourn_df)
+        # print(tourn_df.dtypes)
+        # return tourn_df
+        

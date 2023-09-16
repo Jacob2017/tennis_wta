@@ -20,7 +20,7 @@ SELECT match_id
     ,draw_str
     ,year
     ,level
-FROM wta_matches
+FROM wta_matches_raw
 WHERE tourney_date = date '@date'
 AND tourney_id = '@id'
 AND tourney_name = '@name'

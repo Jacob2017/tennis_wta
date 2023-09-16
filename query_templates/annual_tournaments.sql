@@ -3,15 +3,15 @@ SELECT tourney_id
     ,tourney_date
     ,tourney_level
     ,surface
-    ,year
+    ,season
     ,count(*) as matches 
-FROM wta_matches
-WHERE year = @year
+FROM wta_matches_raw
+WHERE season = @year
 GROUP BY tourney_id
     ,tourney_name
     ,tourney_date
     ,tourney_level
     ,surface
-    ,year
+    ,season
 ORDER BY tourney_date
         ,tourney_id
