@@ -1,17 +1,7 @@
-SELECT tourney_id
-    ,tourney_name
-    ,tourney_date
-    ,tourney_level
-    ,surface
-    ,season
-    ,count(*) as matches 
+SELECT tourney_date as tourn_date
+    ,group_concat(distinct tourney_id) as tourn_id_agg
+    ,group_concat(distinct tourney_name) as tourn_name_agg
 FROM wta_matches_raw
 WHERE season = @year
-GROUP BY tourney_id
-    ,tourney_name
-    ,tourney_date
-    ,tourney_level
-    ,surface
-    ,season
+GROUP BY tourney_date
 ORDER BY tourney_date
-        ,tourney_id

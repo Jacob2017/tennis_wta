@@ -5,8 +5,6 @@ SELECT match_id
     ,winner_name
     ,loser_name
     ,score
-    ,s1
-    ,s2
     ,tourney_name
     ,tourney_date
     ,tourney_level
@@ -14,11 +12,9 @@ SELECT match_id
     ,winner_id
     ,loser_id
     ,best_of
-    ,wo_flag
-    ,short_match_flag
     ,tourney_group
     ,draw_str
-    ,year
+    ,season
     ,level
 FROM wta_matches_raw
 WHERE tourney_date = '@date'
